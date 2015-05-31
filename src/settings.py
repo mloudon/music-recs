@@ -1,3 +1,4 @@
+import os
 import redis
 
 # lastfm API key
@@ -13,6 +14,7 @@ tag_sim_store = redis.StrictRedis('localhost', 6379, db=1, decode_responses=True
 artist_sim_store = redis.StrictRedis('localhost', 6379, db=2, decode_responses=True)
 
 # output file names
-artist_tag_filename = 'artist_tags.csv'
-tag_sim_filename = 'tag_similarity.csv'
-artist_sim_filename =  'artist_similarity.csv'
+output_path = '/home/mel/Desktop'
+artist_tag_filename = os.path.join(output_path,'artist_tags.csv')
+tag_sim_filename = os.path.join(output_path,'tag_similarity.csv')
+artist_sim_filename =  os.path.join(output_path,'artist_similarity.csv')

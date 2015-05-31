@@ -1,3 +1,4 @@
+import csv
 import logging
 from time import sleep
 
@@ -33,8 +34,8 @@ def get_top_tags(artist):
     
     return
 
-def lastfm_fetch ():
-    artists = get_artists(30)
+def lastfm_fetch (count = 30):
+    artists = get_artists(count)
     artist_names = [a['name'] for a in artists['artists']['artist']]
     save_tags(artist_names)
     
@@ -79,3 +80,11 @@ def save_tags(artist_names):
                 logging.error(e)
                 logging.error(tags)
         sleep(1)
+        
+def output_artist_tags(f):
+    with open(f, 'wb') as csvfile:
+        w = csv.writer(csvfile)
+        w.writerow([s.encode('utf-8') for s in ['artist','tags']])
+        for key in artist_tag_store.scan_iter():
+            row = ([s.encode('utf-8') for s in [key,';'.join(artist_tag_store.lrange(key, 0, -1))]])
+            w.writerow (row)
