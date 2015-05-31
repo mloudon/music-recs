@@ -54,8 +54,7 @@ def get_jaccard_sims(bipartite_mode):
     n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == bipartite_mode)
     pairs = combinations(n_set, 2)
     
-    num_pairs = factorial(len(n_set)) / factorial(2) / factorial(len(n_set)-2)
-    logging.info('calculating similarity for %d pairs' % num_pairs)
+    logging.info('calculating similarity for unique unorderd pairs of %d nodes' % len(n_set))
     counter = 0
     
     for (a1, a2) in pairs:
@@ -68,8 +67,8 @@ def get_jaccard_sims(bipartite_mode):
         store.set(pair_to_key(u[1], v[1]), sim)
         
         counter = counter +1
-        if (counter % 100 == 0):
-            logging.info('Calculating similarity for pair %d of %d' % (counter,num_pairs))
+        if (counter % 1000 == 0):
+            logging.info('Calculating similarity for pair %d of %d' % (counter))
             
 def output_sims(bipartite_mode):
     '''
@@ -104,5 +103,5 @@ def output_sims(bipartite_mode):
             w.writerow (row)
             
             counter = counter +1
-            if (counter % 100 == 0):
+            if (counter % 1000 == 0):
                 logging.info('Writing pair %d of %d' % (counter,num_pairs))
