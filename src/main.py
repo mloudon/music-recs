@@ -1,10 +1,14 @@
 import logging
 from time import sleep
 
+from networkx.algorithms import bipartite
+from networkx.algorithms.bipartite.projection import projected_graph
+from networkx.algorithms.link_prediction import jaccard_coefficient
 import redis
 import requests
 from requests.exceptions import HTTPError, ConnectionError
 
+import networkx as nx
 from settings import api_key
 
 
@@ -94,8 +98,27 @@ def artists_tags_print():
 def clear_r_stores():
     for r_store in [artist_tag_store,tag_sim_store,artist_sim_store]:
         r_store.flushdb()
+        
+def get_artists_tags_graph():
+    artists_tags_graph = nx.Graph()
+    for artist in artist_tag_store.scan_iter():
+        artists_tags_graph.add_node(('artist',artist), bipartite=0)
+        for tag in artist_tag_store.lrange(artist, 0, -1):
+            if not ('tag',tag) in artists_tags_graph:
+                artists_tags_graph.add_node(('tag',tag), bipartite=1)
+            artists_tags_graph.add_edge(('artist',artist), ('tag',tag))
+    return artists_tags_graph
     
-def get_co_matrix():
+def get_tag_sim_matrix():
+    g = get_artists_tags_graph()
+    tag_nodes = set(n for n,d in g.nodes(data=True) if d['bipartite']==1)
+    tag_proj = projected_graph(g,tag_nodes)
+    sim_iter = jaccard_coefficient(tag_proj)
+    
+    for (u,v,sim) in sim_iter:
+        if sim > 0:
+            print('%s:%s = %d'%(u[1],v[1],sim))
+        
     return
     
 def get_co (co_matrix, tag1, tag2):
