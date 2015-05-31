@@ -1,7 +1,8 @@
 import csv
 from itertools import combinations
-import logging
 import json
+import logging
+from math import factorial
 
 from networkx.algorithms.link_prediction import jaccard_coefficient
 
@@ -26,6 +27,7 @@ def get_artists_tags_graph():
             if not ('tag', tag) in g:
                 g.add_node(('tag', tag), bipartite=TAG_MODE)
             g.add_edge(('artist', artist), ('tag', tag))
+    logging.info('artists-tags graph has %d nodes and %d edges' % (g.number_of_nodes(),g.number_of_edges()))
     return g
 
 def pair_to_key (p1, p2):
@@ -52,6 +54,10 @@ def get_jaccard_sims(bipartite_mode):
     n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == bipartite_mode)
     pairs = combinations(n_set, 2)
     
+    num_pairs = factorial(len(n_set)) / factorial(2) / factorial(len(n_set)-2)
+    logging.info('calculating similarity for %d pairs' % num_pairs)
+    counter = 0
+    
     for (a1, a2) in pairs:
         sim_iter = jaccard_coefficient(g, [(a1, a2)])
         (u, v, sim) = sim_iter.next()
@@ -60,6 +66,10 @@ def get_jaccard_sims(bipartite_mode):
         elif (bipartite_mode == TAG_MODE):
             store = tag_sim_store
         store.set(pair_to_key(u[1], v[1]), sim)
+        
+        counter = counter +1
+        if (counter % 100 == 0):
+            logging.info('Calculating similarity for pair %d of %d' % (counter,num_pairs))
             
 def output_sims(bipartite_mode):
     '''
@@ -80,6 +90,10 @@ def output_sims(bipartite_mode):
 
     store.set_response_callback('GET', float)  # cast all values returned with get to float
     
+    num_pairs = store.dbsize()
+    logging.info('writing csv file with similarity data for %d pairs' % num_pairs)
+    counter = 0
+    
     with open(f, 'wb') as csvfile:
         w = csv.writer(csvfile)
         for key in store.scan_iter():
@@ -88,3 +102,7 @@ def output_sims(bipartite_mode):
             row = ([s.encode('utf-8') for s in row])
             logging.debug(row)
             w.writerow (row)
+            
+            counter = counter +1
+            if (counter % 100 == 0):
+                logging.info('Writing pair %d of %d' % (counter,num_pairs))
