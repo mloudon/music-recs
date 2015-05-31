@@ -68,7 +68,7 @@ def get_jaccard_sims(bipartite_mode):
         
         counter = counter +1
         if (counter % 1000 == 0):
-            logging.info('Calculating similarity for pair %d of %d' % (counter))
+            logging.info('Calculating similarity for pair %d' % (counter))
             
 def output_sims(bipartite_mode):
     '''
