@@ -1,10 +1,12 @@
 import logging
 
+import redis
 import requests
 from requests.exceptions import HTTPError, ConnectionError
 
 from settings import api_key
 
+r_store = redis.Redis('localhost', 6379)
 
 base_url = 'http://ws.audioscrobbler.com/2.0/'
 
@@ -35,7 +37,8 @@ def get_top_tags(artist):
     
     return
 
-def main():
+def save_data():
+    
     artists = get_artists(10)
     
     if not artists:
@@ -49,8 +52,18 @@ def main():
         if not tags:
             logging.error('no tag data for artist %s' % a_name)
             return
+        tag_list = [t['name'] for t in tags['toptags']['tag']]
+        print ('artist: %s, tags: %s' % (a_name,','.join(tag_list)))
+        r_store.rpush(a_name, *tag_list)
         
-        print ('artist: %s, tags: %s' % (a_name,','.join([t['name'] for t in tags['toptags']['tag']])))
+def print_r_store():
+    
+    for key in r_store.scan_iter():
+        print ('artist: %s, tags: %s' % (key,','.join(r_store.lrange(key, 0, -1))))
         
+        
+def main():
+    return
+
 if __name__ == "__main__": main()
         
