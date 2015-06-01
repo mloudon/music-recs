@@ -31,6 +31,12 @@ def get_artists_tags_graph():
     return g
 
 def jaccard_sims(g, bipartite_mode, pairs):
+    '''
+    return a generator that yields tuples of form (label1,label2,sim) for all non-zero similarities in the given node pairs
+    :param g: the artists tags graph
+    :param bipartite_mode: which set of nodes to calculate similarity for: ARTIST_MODE or TAG_MODE
+    :param pairs: tuple of pairs of artist or tag nodes (an ebunch in networkx)
+    '''
 
     if bipartite_mode not in [ARTIST_MODE, TAG_MODE]:
         logging.error('invalid value for bipartite mode: %d' % bipartite_mode)
@@ -47,24 +53,30 @@ def jaccard_sims(g, bipartite_mode, pairs):
         if (counter % 10000 == 0):
             logging.info('Calculated similarity for pair %d, mode %d' % (counter, bipartite_mode))
             
-def get_top_five(tag):
-    g = get_artists_tags_graph()
-    tag_node = ('tag',tag)
+def get_top_n(g, tag, n=5):
+    '''
+    get the top n most similiar tags for a given tag
+    returns a dict of at most n tag:similiarity pairs
+    :param g: the artists tags graph
+    :param tag: the tag name
+    :param n: the maximum number of similar tags to be returned
+    '''
+    tag_node = ('tag', tag)
     if not tag_node in g:
-        logging.error('Node not in graph: %s'%tag_node)
+        logging.error('Node not in graph: %s' % tag_node[1])
         return
     
     n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == TAG_MODE)
     n_set.remove(tag_node)
-    pairs = [(tag_node,t) for t in n_set]
-    sims = {v:sim for (u,v,sim) in jaccard_sims(g,TAG_MODE,pairs)}
-    return dict(sorted(sims.iteritems(), key=operator.itemgetter(1), reverse=True)[:5])
-    
+    pairs = [(tag_node, t) for t in n_set]
+    sims = {v:sim for (u, v, sim) in jaccard_sims(g, TAG_MODE, pairs)}
+    max_len = n if len(sims) >= n else len(sims)
+    return dict(sorted(sims.iteritems(), key=operator.itemgetter(1), reverse=True)[:max_len])   
             
 
 def output_sims(bipartite_mode):
     '''
-    save pairwise similarity for all nodes in a particular mode to csv file specified in settings
+    write non-zero jaccard similarity for all nodes in a particular mode to csv file specified in settings
     file format artist1,artist2,sim (or tag1,tag2,sim)
     :param bipartite_mode: which set of nodes to calculate similarity for: ARTIST_MODE or TAG_MODE
     '''
@@ -74,13 +86,13 @@ def output_sims(bipartite_mode):
     f = artist_sim_filename if bipartite_mode == ARTIST_MODE else tag_sim_filename
     
     g = get_artists_tags_graph()
-    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == bipartite_mode)
-    pairs = combinations(n_set, 2) # all pairs of nodes, unordered i.e. nodeset choose 2 
-    sims = jaccard_sims(g, bipartite_mode, pairs)
-    
+    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == bipartite_mode)  # all nodes for mode
     logging.info('calculating similarity for unique unorderd pairs of %d nodes' % len(n_set))
-    calc_counter = 0
     
+    pairs = combinations(n_set, 2)  # all pairs of nodes, unordered i.e. nodeset choose 2 
+    sims = jaccard_sims(g, bipartite_mode, pairs)  # all non-zero similarities for node pairs
+    
+    calc_counter = 0
     with open(f, 'wb') as csvfile:
         w = csv.writer(csvfile)
         for (tag1, tag2, sim) in sims:
