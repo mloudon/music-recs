@@ -20,7 +20,7 @@ def main():
     clear_r_stores()
     
     logging.info('Fetching Last.fm data...')
-    lastfm_fetch(1000)
+    lastfm_fetch(30)
     output_artist_tags()
     
     for mode in [ARTIST_MODE, TAG_MODE]:

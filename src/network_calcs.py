@@ -30,15 +30,6 @@ def get_artists_tags_graph():
     logging.info('artists-tags graph has %d nodes and %d edges' % (g.number_of_nodes(),g.number_of_edges()))
     return g
 
-def pair_to_key (p1, p2):
-    '''
-    sort a pair of strings, dumps to json, returns json string
-    used to create unique keys for pairs of artists or tags, with predictable ordering
-    :param p1: first string
-    :param p2: second string
-    '''
-    return json.dumps(sorted(list((p1, p2))))
-
 def get_jaccard_sims(bipartite_mode):
     '''
     get the jaccard similarity for all pairs of nodes of the same mode and save to data store
@@ -64,11 +55,12 @@ def get_jaccard_sims(bipartite_mode):
             store = artist_sim_store
         elif (bipartite_mode == TAG_MODE):
             store = tag_sim_store
-        store.set(pair_to_key(u[1], v[1]), sim)
+        store.hset(u[1], v[1], sim)
+        store.hset(v[1], u[1], sim)  # store duplicates so that we can look up any tag by any others
         
         counter = counter +1
-        if (counter % 1000 == 0):
-            logging.info('Calculating similarity for pair %d' % (counter))
+        if (counter % 10000 == 0):
+            logging.info('Calculating similarity for pair %d, mode %d' % (counter,bipartite_mode))
             
 def output_sims(bipartite_mode):
     '''
@@ -86,22 +78,33 @@ def output_sims(bipartite_mode):
     else:  # tag mode
         store = tag_sim_store
         f = tag_sim_filename
-
-    store.set_response_callback('GET', float)  # cast all values returned with get to float
     
-    num_pairs = store.dbsize()
-    logging.info('writing csv file with similarity data for %d pairs' % num_pairs)
+    store.set_response_callback('HMGET', lambda l: [float(i) for i in l]) # return float for every value returned by hmget
+    num_keys = store.dbsize()
+    logging.info('writing csv file with similarity data for %d pairs' % num_keys)
     counter = 0
     
     with open(f, 'wb') as csvfile:
         w = csv.writer(csvfile)
         for key in store.scan_iter():
-            row = json.loads(key)
-            row.append('%.8f' % store.get(key))
-            row = ([s.encode('utf-8') for s in row])
-            logging.debug(row)
-            w.writerow (row)
+            tag1 = key
+            tags = store.hkeys(tag1)
+            vals = store.hmget(tag1,tags)
+            tag_vals_dict = dict(zip(tags,vals))
+            
+            for k,v in tag_vals_dict.iteritems():
+                if (tag1 <= k): # only print half the pairs
+                    row = [tag1,k]
+                    row.append('%.8f' % v)
+                    row = ([s.encode('utf-8') for s in row])
+                    logging.debug(row)
+                    w.writerow (row)
+                    
+                    if (tag1==k):
+                        logging.warn('wrote similarity pair for two identical tags, pair will be duplicated')
+                else:
+                    logging.debug('not writing pair %s:%s, reverse order will be written' % (tag1,k))
             
             counter = counter +1
-            if (counter % 1000 == 0):
-                logging.info('Writing pair %d of %d' % (counter,num_pairs))
+            if (counter % 100 == 0):
+                logging.info('Writing similarity data for node %d of %d' % (counter,num_keys))
