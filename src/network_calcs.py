@@ -3,6 +3,7 @@ from itertools import combinations
 import json
 import logging
 from math import factorial
+import operator
 
 from networkx.algorithms.link_prediction import jaccard_coefficient
 
@@ -37,14 +38,28 @@ def jaccard_sims(g, bipartite_mode, pairs):
     
     counter = 0
     for (a1, a2) in pairs:
-        sim_iter = jaccard_coefficient(g, [(a1, a2)])
-        (u, v, sim) = sim_iter.next()
-        
+        if (set(g.neighbors(a1)).intersection(set(g.neighbors(a2)))):
+            sim_iter = jaccard_coefficient(g, [(a1, a2)])
+            (u, v, sim) = sim_iter.next()
+            yield(u[1], v[1], sim)
+            
         counter = counter + 1
         if (counter % 10000 == 0):
-            logging.info('Calculating similarity for pair %d, mode %d' % (counter, bipartite_mode))
-        
-        yield(u[1], v[1], sim)
+            logging.info('Calculated similarity for pair %d, mode %d' % (counter, bipartite_mode))
+            
+def get_top_five(tag):
+    g = get_artists_tags_graph()
+    tag_node = ('tag',tag)
+    if not tag_node in g:
+        logging.error('Node not in graph: %s'%tag_node)
+        return
+    
+    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == TAG_MODE)
+    n_set.remove(tag_node)
+    pairs = [(tag_node,t) for t in n_set]
+    sims = {v:sim for (u,v,sim) in jaccard_sims(g,TAG_MODE,pairs)}
+    return dict(sorted(sims.iteritems(), key=operator.itemgetter(1), reverse=True)[:5])
+    
             
 
 def output_sims(bipartite_mode):
@@ -64,17 +79,17 @@ def output_sims(bipartite_mode):
     sims = jaccard_sims(g, bipartite_mode, pairs)
     
     logging.info('calculating similarity for unique unorderd pairs of %d nodes' % len(n_set))
-    counter = 0
+    calc_counter = 0
     
     with open(f, 'wb') as csvfile:
         w = csv.writer(csvfile)
         for (tag1, tag2, sim) in sims:
             row = [tag1, tag2]
-            row.append('%.8f' % sim)
             row = ([s.encode('utf-8') for s in row])
+            row.append(sim)
             logging.debug(row)
             w.writerow (row)
-            
-            counter = counter + 1
-            if (counter % 100 == 0):
-                logging.info('Writing similarity data for pair %d, mode %d' % (counter, bipartite_mode))
+
+            calc_counter = calc_counter + 1
+            if (calc_counter % 10000 == 0):
+                logging.info('Wrote non-zero similarity data for pair %d, mode %d' % (calc_counter, bipartite_mode))
