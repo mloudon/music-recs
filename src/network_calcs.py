@@ -64,8 +64,8 @@ def get_top_n(g, node, n=5):
     g_proj = nx.projected_graph(g,n_set)
     sims = {v:sim for (u, v, sim) in jaccard_sims(g, mode, g_proj.edges_iter(node))}
     max_len = n if len(sims) >= n else len(sims)
-    return dict(sorted(sims.iteritems(), key=operator.itemgetter(1), reverse=True)[:max_len])   
-            
+    return dict(sorted(sims.iteritems(), key=operator.itemgetter(1), reverse=True)[:max_len])
+        
 
 def output_sims(bipartite_mode):
     '''
