@@ -1,8 +1,5 @@
 import csv
-from itertools import combinations
-import json
 import logging
-from math import factorial
 import operator
 
 from networkx.algorithms.link_prediction import jaccard_coefficient
