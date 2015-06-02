@@ -32,7 +32,7 @@ def get_artists_tags_graph():
 
 def jaccard_sims(g, bipartite_mode, pairs):
     '''
-    return a generator that yields tuples of form (label1,label2,sim) for all non-zero similarities in the given node pairs
+    return a generator that yields tuples of form (label1,label2,sim) for all similarities in the given node pairs
     :param g: the artists tags graph
     :param bipartite_mode: which set of nodes to calculate similarity for: ARTIST_MODE or TAG_MODE
     :param pairs: tuple of pairs of artist or tag nodes (an ebunch in networkx)
@@ -42,34 +42,30 @@ def jaccard_sims(g, bipartite_mode, pairs):
         logging.error('invalid value for bipartite mode: %d' % bipartite_mode)
         return
     
-    counter = 0
-    for (a1, a2) in pairs:
-        if (set(g.neighbors(a1)).intersection(set(g.neighbors(a2)))):
-            sim_iter = jaccard_coefficient(g, [(a1, a2)])
-            (u, v, sim) = sim_iter.next()
-            yield(u[1], v[1], sim)
+    for counter,(a1, a2) in enumerate(pairs):
+        sim_iter = jaccard_coefficient(g, [(a1, a2)])
+        (u, v, sim) = sim_iter.next()
+        yield(u[1], v[1], sim)
             
-        counter = counter + 1
         if (counter % 10000 == 0):
             logging.info('Calculated similarity for pair %d, mode %d' % (counter, bipartite_mode))
             
-def get_top_n(g, tag, n=5):
+def get_top_n(g, node, n=5):
     '''
-    get the top n most similiar tags for a given tag
-    returns a dict of at most n tag:similiarity pairs
+    get the top n most similar nodes for a given node
+    returns a dict of at most n node:similiarity pairs
     :param g: the artists tags graph
-    :param tag: the tag name
+    :param node: the node ('artist',name) or ('tag',name)
     :param n: the maximum number of similar tags to be returned
     '''
-    tag_node = ('tag', tag)
-    if not tag_node in g:
-        logging.error('Node not in graph: %s' % tag_node[1])
+    if not node in g:
+        logging.error('Node not in graph: %s' % node[1])
         return
+    mode = g.node[node]['bipartite']
     
-    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == TAG_MODE)
-    n_set.remove(tag_node)
-    pairs = [(tag_node, t) for t in n_set]
-    sims = {v:sim for (u, v, sim) in jaccard_sims(g, TAG_MODE, pairs)}
+    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == mode)
+    g_proj = nx.projected_graph(g,n_set)
+    sims = {v:sim for (u, v, sim) in jaccard_sims(g, mode, g_proj.edges_iter(node))}
     max_len = n if len(sims) >= n else len(sims)
     return dict(sorted(sims.iteritems(), key=operator.itemgetter(1), reverse=True)[:max_len])   
             
@@ -86,22 +82,19 @@ def output_sims(bipartite_mode):
     f = artist_sim_filename if bipartite_mode == ARTIST_MODE else tag_sim_filename
     
     g = get_artists_tags_graph()
-    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == bipartite_mode)  # all nodes for mode
-    logging.info('calculating similarity for unique unorderd pairs of %d nodes' % len(n_set))
+    n_set = set(n for n, d in g.nodes(data=True) if d['bipartite'] == bipartite_mode)
+    g_proj = nx.projected_graph(g,n_set)
+    sims = jaccard_sims(g, bipartite_mode, g_proj.edges_iter())  # all edges
+    logging.info('calculating similarity for %d unique unorderd pairs' % g_proj.number_of_edges())
     
-    pairs = combinations(n_set, 2)  # all pairs of nodes, unordered i.e. nodeset choose 2 
-    sims = jaccard_sims(g, bipartite_mode, pairs)  # all non-zero similarities for node pairs
-    
-    calc_counter = 0
     with open(f, 'wb') as csvfile:
         w = csv.writer(csvfile)
-        for (tag1, tag2, sim) in sims:
+        for counter,(tag1, tag2, sim) in enumerate(sims):
             row = [tag1, tag2]
             row = ([s.encode('utf-8') for s in row])
             row.append(sim)
             logging.debug(row)
             w.writerow (row)
 
-            calc_counter = calc_counter + 1
-            if (calc_counter % 10000 == 0):
-                logging.info('Wrote non-zero similarity data for pair %d, mode %d' % (calc_counter, bipartite_mode))
+            if (counter % 10000 == 0):
+                logging.info('Wrote non-zero similarity data for pair %d, mode %d' % (counter, bipartite_mode))
