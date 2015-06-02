@@ -1,3 +1,4 @@
 /env/
 src/settings.py
 src/*.pyc
+.Rproj.user
