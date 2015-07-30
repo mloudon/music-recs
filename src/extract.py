@@ -6,7 +6,7 @@ import requests
 from requests.exceptions import ConnectionError, HTTPError
 
 from settings import base_url, api_key, max_retries, artist_tag_store, \
-    artist_tag_filename
+    artist_tag_filename, ARTIST_PREFIX
 
 
 def get_artists(count=1000):
@@ -57,7 +57,7 @@ def lastfm_fetch (count=30):
     incomplete = True
     
     while retries <= max_retries and incomplete:
-        saved_artists = [k for k in artist_tag_store.scan_iter()]
+        saved_artists = [k.lstrip(ARTIST_PREFIX) for k in artist_tag_store.scan_iter()]
         missing_artists = list(set(artist_names) - set(saved_artists))
         
         if not missing_artists:
@@ -92,7 +92,7 @@ def save_tags(artist_names):
         else:
             try:
                 tag_list = [t['name'] for t in tags['toptags']['tag']]
-                artist_tag_store.rpush(artist, *tag_list)
+                artist_tag_store.rpush(ARTIST_PREFIX + artist, *tag_list)
                 logging.info('saved tags for artist: %s, tags: %s' % (artist, ','.join(tag_list)))
             except (KeyError, TypeError) as e:
                 logging.error('No data saved for artist %s' % artist)
@@ -108,6 +108,6 @@ def output_artist_tags():
         w = csv.writer(csvfile)
         w.writerow([s.encode('utf-8') for s in ['artist', 'tags']])
         for key in artist_tag_store.scan_iter():
-            row = ([s.encode('utf-8') for s in [key, ';'.join(artist_tag_store.lrange(key, 0, -1))]])
+            row = ([s.encode('utf-8') for s in [key.lstrip(ARTIST_PREFIX), ';'.join(artist_tag_store.lrange(key, 0, -1))]])
             logging.debug(row)
             w.writerow (row)

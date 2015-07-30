@@ -5,7 +5,8 @@ import operator
 from networkx.algorithms.link_prediction import jaccard_coefficient
 
 import networkx as nx
-from settings import artist_tag_store, artist_sim_filename, tag_sim_filename
+from settings import artist_tag_store, artist_sim_filename, tag_sim_filename, \
+    ARTIST_PREFIX
 
 
 # mode constants for the artist and tag node sets in the bipartite artist-tag network - see networkx bipartite docs
@@ -19,11 +20,12 @@ def get_artists_tags_graph():
     '''
     g = nx.Graph()
     for artist in artist_tag_store.scan_iter():
-        g.add_node(('artist', artist), bipartite=ARTIST_MODE)
+        artist_name = artist.lstrip(ARTIST_PREFIX)
+        g.add_node(('artist', artist_name), bipartite=ARTIST_MODE)
         for tag in artist_tag_store.lrange(artist, 0, -1):
             if not ('tag', tag) in g:
                 g.add_node(('tag', tag), bipartite=TAG_MODE)
-            g.add_edge(('artist', artist), ('tag', tag))
+            g.add_edge(('artist', artist_name), ('tag', tag))
     logging.info('artists-tags graph has %d nodes and %d edges' % (g.number_of_nodes(), g.number_of_edges()))
     return g
 
